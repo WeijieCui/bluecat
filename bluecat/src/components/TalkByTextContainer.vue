@@ -1,32 +1,50 @@
 <template>
   <div id="container">
     <div>
-      <button @click="startListening" style="margin-right: 20px;">Start Listening</button>
-      <button @click="stopListening">Stop Listening</button>
-      <button @click="clear">Clear</button>
-      <div v-for="(message, index) in messages" :key="index">
-        <p v-if="message.role === 'system'" style="float: left">
+      <button @click="startListening" style="margin-right: 80px;">
+        <font-awesome-icon :icon="['fas', 'microphone']" :class="{ 'recording': isRecording, 'fa-8x': true }"/>
+      </button>
+      <button @click="stopListening" style="margin-right: 80px;">
+        <font-awesome-icon :icon="['fas', 'stop']" :class="{'fa-8x': true }"/>
+      </button>
+      <button @click="clear">
+        <font-awesome-icon :icon="['fas', 'burn']" :class="{'fa-8x': true }"/>
+      </button>
+      <div v-for="(message, index) in messages" :key="index" style="margin-left:10%;width: 80%;">
+        <div v-if="message.role === 'system'" style="width: 80%;text-align: left;">
           <strong style="margin-right: 10px">Robot</strong>
           {{ message.content }}
-        </p>
-        <p v-if="message.role === 'user'" style="float: right">
+        </div>
+        <div v-if="message.role === 'user'" style="margin-left: 20%; width: 80%;text-align: right;">
           {{ message.content }}<strong style="margin-left: 10px">You</strong>
-        </p>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script lang="js">
+import {library} from '@fortawesome/fontawesome-svg-core';
+import {faMicrophone, faStop, faBurn} from '@fortawesome/free-solid-svg-icons';
+import {FontAwesomeIcon} from '@fortawesome/vue-fontawesome';
+
+library.add(faMicrophone, faStop, faBurn);
+
 export default {
-  name: "TalkContainer",
+  name: "TalkByTextContainer",
   props: {
     msg: String,
+    language: String,
+    utteranceLang: String,
+  },
+  components: {
+    FontAwesomeIcon
   },
   data() {
     return {
       recognition: null,
       messages: [],
+      isRecording: false,
     }
   },
   created() {
@@ -37,7 +55,7 @@ export default {
       this.recognition = new SpeechRecognition();
 
       // Set the language (optional)
-      // this.recognition.lang = 'en-US';
+      this.recognition.lang = this.language;
 
       // Set continuous mode to true to keep the microphone on
       this.recognition.continuous = true;
@@ -49,8 +67,19 @@ export default {
       this.recognition.onresult = (event) => {
         for (let i = event.resultIndex; i < event.results.length; i++) {
           if (event.results[i].isFinal) {
+            const transcript = event.results[i][0].transcript;
+            if (transcript === 'stop') {
+              this.stopListening();
+              return;
+            }else if (transcript === '' || transcript === null || transcript === undefined) {
+              return;
+            }
             this.stopListening();
-            this.messages.push({role: 'user', content: event.results[i][0].transcript});
+            if (this.messages.length > 2){
+              this.messages.shift();
+              this.messages.shift();
+            }
+            this.messages.push({role: 'user', content: transcript});
             fetch("http://localhost:5000/bluecat_bk/chat_by_text", {
               method: "POST",
               body: JSON.stringify({messages: this.messages}),
@@ -77,11 +106,11 @@ export default {
       this.stopListening();
       // Create a new SpeechSynthesisUtterance instance
       const utterance = new SpeechSynthesisUtterance(reply);
+      // Set the language (optional)
+      utterance.lang = this.utteranceLang;
       utterance.onend = () => {
         this.startListening();
       };
-      // Set the language (optional)
-      utterance.lang = 'en-US';
 
       // Set the volume (optional)
       utterance.volume = 1;
@@ -99,16 +128,24 @@ export default {
       if (window.speechSynthesis.speaking) {
         window.speechSynthesis.cancel();
       }
+      this.isRecording = true;
       if (this.recognition) {
         this.recognition.start();
       }
     },
     stopListening() {
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+      }
+      this.isRecording = false;
       if (this.recognition) {
         this.recognition.stop();
       }
     },
     clear() {
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+      }
       this.messages = [];
     },
   }
@@ -139,5 +176,21 @@ export default {
 
 #container a {
   text-decoration: none;
+}
+
+.recording {
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 </style>

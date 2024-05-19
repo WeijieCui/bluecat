@@ -16,7 +16,7 @@ client = OpenAI(
 )
 model = None
 
-PATTERN = r'(\n)|\*|#|-'
+PATTERN = r'(\n)|\*|#|-|\\'
 
 
 @app.route('/bluecat_bk/chat', methods=['POST'])
@@ -49,7 +49,7 @@ def chat():
                 'content': result["text"],
             }
         ],
-        max_tokens=50,
+        max_tokens=200,
         model="gpt-4o-2024-05-13",
     )
     complement = fine_response(response.choices[0].message.content)
@@ -74,7 +74,7 @@ def chat_by_text():
     print('receive a request:', datetime.now().strftime('%Y%m%d%H%M%S'))
     response = client.chat.completions.create(
         messages=request.get_json().get('messages'),
-        max_tokens=50,
+        max_tokens=300,
         model="gpt-4o-2024-05-13",
     )
     complement = fine_response(response.choices[0].message.content)
