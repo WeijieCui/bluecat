@@ -19,5 +19,5 @@
 
 <script setup lang="js">
 import { IonPage, IonHeader, IonToolbar, IonTitle, IonContent } from '@ionic/vue';
-import ExploreContainer from '@/components/ExploreContainer.vue';
+import ExploreContainer from '@/components/TalkByTextContainer.vue';
 </script>

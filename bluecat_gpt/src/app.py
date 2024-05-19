@@ -3,24 +3,18 @@ import re
 import time
 from datetime import datetime
 
-import pyttsx3
 from flask import Flask, request, send_file, jsonify
 from flask_cors import CORS
 
-from gtts import gTTS
-import whisper
 from openai import OpenAI
 
 app = Flask(__name__)
 CORS(app, origins='*')
 
 client = OpenAI(
-    api_key= os.environ.get("OPENAI_API_KEY"),
+    api_key=os.environ.get("OPENAI_API_KEY"),
 )
-
-model = whisper.load_model("large")
-
-engine = pyttsx3.init()
+model = None
 
 PATTERN = r'(\n)|\*|#|-'
 
@@ -29,6 +23,15 @@ PATTERN = r'(\n)|\*|#|-'
 def chat():
     t0 = time.time()
     print('receive a request:', t0)
+    from gtts import gTTS
+    import whisper
+    global model
+    if model is None:
+        model_path = '..\\models\\base.pt'
+        if os.path.exists(model_path):
+            model = whisper.load_model(model_path)
+        else:
+            model = whisper.load_model('base')
     audio_file = request.files['audio']
     t = datetime.now().strftime('%Y%m%d%H%M%S')
     input_file = "input_{}.webm".format(t)
@@ -65,9 +68,20 @@ def chat():
     return send_file(output_file, mimetype='audio/mpeg')
 
 
-def say_pyttsx3(text: str):
-    engine.say(text)
-    return engine.runAndWait()
+@app.route('/bluecat_bk/chat_by_text', methods=['POST'])
+def chat_by_text():
+    t0 = time.time()
+    print('receive a request:', datetime.now().strftime('%Y%m%d%H%M%S'))
+    response = client.chat.completions.create(
+        messages=request.get_json().get('messages'),
+        max_tokens=50,
+        model="gpt-4o-2024-05-13",
+    )
+    complement = fine_response(response.choices[0].message.content)
+    print('input:{}, output:{}, pt: {}, ct:{}, time: {}'
+          .format(request.get_json().get('messages'), complement, response.usage.prompt_tokens,
+                  response.usage.completion_tokens, time.time() - t0))
+    return {'reply': complement}
 
 
 def fine_response(text: str) -> str:
@@ -81,4 +95,3 @@ def not_found(e):
 
 if __name__ == "__main__":
     app.run(debug=True)
-    # print(fine_response('abc*ced*.eef\n\n1abc'))

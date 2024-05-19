@@ -6,7 +6,6 @@
     <button @click="stopRecording">
       <font-awesome-icon :icon="['fas', 'stop']" :class="{'fa-4x': true }"/>
     </button>
-
   </div>
 </template>
 

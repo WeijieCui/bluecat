@@ -1,13 +1,18 @@
 <template>
   <div id="container">
-    <div style="margin-bottom: 50px;">
-      <input v-model="words" type="text">
-      <button @click="textToSpeech()">Speak Text</button>
-    </div>
     <div>
       <button @click="startListening" style="margin-right: 20px;">Start Listening</button>
       <button @click="stopListening">Stop Listening</button>
-      <p>{{ transcript }}</p>
+      <button @click="clear">Clear</button>
+      <div v-for="(message, index) in messages" :key="index">
+        <p v-if="message.role === 'system'" style="float: left">
+          <strong style="margin-right: 10px">Robot</strong>
+          {{ message.content }}
+        </p>
+        <p v-if="message.role === 'user'" style="float: right">
+          {{ message.content }}<strong style="margin-left: 10px">You</strong>
+        </p>
+      </div>
     </div>
   </div>
 </template>
@@ -20,9 +25,8 @@ export default {
   },
   data() {
     return {
-      words: null,
       recognition: null,
-      transcript: '',
+      messages: [],
     }
   },
   created() {
@@ -33,7 +37,7 @@ export default {
       this.recognition = new SpeechRecognition();
 
       // Set the language (optional)
-      this.recognition.lang = 'en-US';
+      // this.recognition.lang = 'en-US';
 
       // Set continuous mode to true to keep the microphone on
       this.recognition.continuous = true;
@@ -45,7 +49,22 @@ export default {
       this.recognition.onresult = (event) => {
         for (let i = event.resultIndex; i < event.results.length; i++) {
           if (event.results[i].isFinal) {
-            this.transcript = event.results[i][0].transcript;
+            this.stopListening();
+            this.messages.push({role: 'user', content: event.results[i][0].transcript});
+            fetch("http://localhost:5000/bluecat_bk/chat_by_text", {
+              method: "POST",
+              body: JSON.stringify({messages: this.messages}),
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }).then(response => response.json()).then(data => {
+              console.log(data);
+              this.reply = data.reply;
+              this.messages.push({role: 'system', content: data.reply});
+              this.textToSpeech(data.reply);
+            }).catch(error => {
+              console.error('Error:', error);
+            });
           }
         }
       };
@@ -54,10 +73,13 @@ export default {
     }
   },
   methods: {
-    textToSpeech() {
+    textToSpeech(reply) {
+      this.stopListening();
       // Create a new SpeechSynthesisUtterance instance
-      const utterance = new SpeechSynthesisUtterance(this.words);
-
+      const utterance = new SpeechSynthesisUtterance(reply);
+      utterance.onend = () => {
+        this.startListening();
+      };
       // Set the language (optional)
       utterance.lang = 'en-US';
 
@@ -74,6 +96,9 @@ export default {
       window.speechSynthesis.speak(utterance);
     },
     startListening() {
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+      }
       if (this.recognition) {
         this.recognition.start();
       }
@@ -82,6 +107,9 @@ export default {
       if (this.recognition) {
         this.recognition.stop();
       }
+    },
+    clear() {
+      this.messages = [];
     },
   }
 };
